@@ -251,7 +251,6 @@ class App_Member(models.Model):
     email_ids = fields.Many2many('member.emailing.status', string="Email Status")
 
     payment_ids = fields.Many2many('account.payment', string='All Payments')# , compute="get_payment_ids")
-
     
     # @api.one
     @api.depends('invoice_id')
