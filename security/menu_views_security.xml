@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+      
+
+        <menuitem name="Procurement"
+            id="purchase.menu_purchase_root"
+            groups="purchase.group_purchase_manager,purchase.group_purchase_user,ikoyi_module.procurement_officer_ikoyi,ikoyi_module.procurement_manager_ikoyi"
+            web_icon="purchase,static/description/icon.png"
+            sequence="25"/>
+
+        <menuitem id="purchase.menu_procurement_management" name="Purchase"
+            parent="purchase.menu_purchase_root" sequence="1" groups="purchase.group_purchase_user,purchase.group_purchase_manager,ikoyi_module.procurement_officer_ikoyi,ikoyi_module.procurement_manager_ikoyi" />
+
+
+        <menuitem name="Accounting"
+            id="account.menu_finance"
+            groups="account.group_account_user,account.group_account_manager,account.group_account_invoice,ikoyi_module.audit_boss_ikoyi,ikoyi_module.account_payable_ikoyi,ikoyi_module.account_boss_ikoyi,ikoyi_module.accountant_ikoyi"
+            web_icon="account,static/description/icon.png"
+            sequence="40"/>
+        <menuitem name="Inventory" id="stock.menu_stock_root" sequence="30"
+        groups="stock.group_stock_manager,stock.group_stock_user,ikoyi_module.store_keeper_ikoyi,ikoyi_module.inventory_manager_ikoyi"
+        web_icon="stock,static/description/icon.png"/>
+
+    </data>
+</odoo>
+
+
+
+
+
+
+
