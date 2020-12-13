@@ -388,21 +388,21 @@ class App_Member(models.Model):
     position_holder = fields.Char('Position in Company')
     nok_address_work = fields.Text('Next of Kin Address') 
 
-    def cripple_advance_and_outstanding(self):
-        for rec in self.sub_line:
-            rec.write({
-                'advance_amount': 0,
-                'outstanding': 0
-            })
+    # def cripple_advance_and_outstanding(self):
+    #     for rec in self.sub_line:
+    #         rec.write({
+    #             'advance_amount': 0,
+    #             'outstanding': 0
+    #         })
 
-        summ_line_ids = self.mapped('summary_line')
-        for res in summ_line_ids:
-            period_payment_ids = res.mapped('period_payment_line')
-            if period_payment_ids:
-                for py in period_payment_ids:
-                    py.write({
-                        'mark_paid': True, 
-                    })
+    #     summ_line_ids = self.mapped('summary_line')
+    #     for res in summ_line_ids:
+    #         period_payment_ids = res.mapped('period_payment_line')
+    #         if period_payment_ids:
+    #             for py in period_payment_ids:
+    #                 py.write({
+    #                     'mark_paid': True, 
+    #                 })
     def subscription_payment_lines(self, name, total_sum, amountpaid, pdate, advance_amount, outstanding, periods_month, payment_id, mark_paid=False):
         values = {
             'name': name,
@@ -544,45 +544,79 @@ class App_Member(models.Model):
             raise ValidationError("Ensure you add the summary line to compute payment")
 
     def get_amount_to_pay(self):
-        subline_ids = self.mapped('sub_line')
-        balance_from_sub_line = sum([amt.outstanding for amt in subline_ids])
-        advance_from_sub_line = sum([amt.advance_amount for amt in subline_ids])
-        to_pay = advance_from_sub_line - balance_from_sub_line 
-        if abs(to_pay) > 0:
-            return abs(to_pay)
+        # TODO Remove
+        pass
+        # subline_ids = self.mapped('sub_line')
+        # balance_from_sub_line = sum([amt.outstanding for amt in subline_ids])
+        # advance_from_sub_line = sum([amt.advance_amount for amt in subline_ids])
+        # to_pay = advance_from_sub_line - balance_from_sub_line 
+        # if abs(to_pay) > 0:
+        #     return abs(to_pay)
 
     @api.multi
     def generate_payment(self):
         return self.create_member_bill()
 
-    # @api.multi
-    # def generate_payment(self): #, record_id, type="membership"):
-    #     self.regulate_payment()
-    #     total_sum = self.get_amount_to_pay()
-        # return {
-        #     'name': "Register Payment",
-        #     'view_type': 'form',
-        #     "view_mode": 'form',
-        #     'res_model': 'account.payment',
-        #     'type': 'ir.actions.act_window',
-        #     'target': 'new',
-        #     'context': {
-        #         'default_partner_id': self.partner_id.id,
-        #         # 'default_journal_id': False,
-        #         'default_amount' :total_sum, 
-        #         'default_member_id': self.id,
-        #         'default_payment_type': 'inbound',
-        #         'default_balance_total': balance_total,
-        #         # 'default_outstanding_advances': self.outstanding_advances,
-        #         'default_member_reference': record_id, 
-        #         'default_member_type': type, 
-        #         'default_amount_to_pay': total_sum, 
-        #         'default_subscription_period': self.subscription_period if self.state in ['green', 'temp', 'ord', 'jun', 'life', 'hon', 'suspension'] else False, 
-        #         # 'default_section_line': [(6, 0, [rec.id for rec in self.section_line)],
-        #     },
-        # }
+    def check_advance_payment(self):
+        advance_amt = 0, 
+        if self.balance_total < 0:
+            advance_amt = abs(self.balance_total)
+        else:
+            raise ValidationError('Member does not have any Advance Payment!')
+        return advance_amt 
 
+    def check_outstanding_payment(self):
+        outstanding_amt = 0, 
+        if self.balance_total > 0:
+            outstanding_amt = self.balance_total 
+        else:
+            raise ValidationError('Member does not have any outstanding to pay')
+        return outstanding_amt 
 
+    @api.multi
+    def clear_advances_payment(self):
+        advance_amt = self.check_advance_payment()
+        self.partner_id.supplier = True
+        return {
+            'name': "Clear Advances",
+            'view_type': 'form',
+            "view_mode": 'form',
+            'res_model': 'account.payment',
+            'type': 'ir.actions.act_window',
+            'target': 'new',
+            'context': {
+                'default_partner_id': self.partner_id.id,
+                # 'default_journal_id': False,
+                'default_amount': advance_amt, 
+                # 'default_member_id': self.id,
+                'default_partner_type': 'supplier',
+                'default_payment_type': 'outbound',
+                'default_amount_to_pay': advance_amt, 
+            },
+        }
+    
+    @api.multi
+    def clear_outstanding_payment(self):
+        outstanding = self.check_outstanding_payment()
+        return {
+            'name': "Register Outstanding Payment",
+            'view_type': 'form',
+            "view_mode": 'form',
+            'res_model': 'account.payment',
+            'type': 'ir.actions.act_window',
+            'target': 'new',
+            'context': {
+                'default_partner_id': self.partner_id.id,
+                # 'default_journal_id': False,
+                'default_amount': outstanding, 
+                # 'default_member_id': self.id,
+                'default_payment_type': 'inbound',
+                'default_partner_type': 'customer', 
+                'default_amount_to_pay': outstanding,
+
+            },
+        }
+ 
     @api.onchange('duration_period')
     def change_number_period(self):
         if self.duration_period == "Full Year":
@@ -691,10 +725,7 @@ class App_Member(models.Model):
                     check.write({
                         'member_cost': 0,
                         'spouse_cost': 0,
-                        'child_cost': 0,
-                        # 'member_initial_amount': amount,
-                        # 'spouse_initial_amount': 0,
-                        # 'child_initial_amount': 0,
+                        'child_cost': 0, 
                     })
         else:
             summary_line_id = summary_line_obj.create({
@@ -704,9 +735,7 @@ class App_Member(models.Model):
                     'member_cost': amount,
                     'spouse_cost': 0,
                     'child_cost': 0,
-                    'member_initial_amount': amount,
-                    # 'spouse_initial_amount': 0,
-                    # 'child_initial_amount': 0,
+                    'member_initial_amount': amount, 
                     'subscription_period': self.subscription_period,
                 })
              
@@ -717,8 +746,10 @@ class App_Member(models.Model):
         lines without updating or generating a new bill for non paid sections
         If True: system goes into the period lines in each summary lines and checks the ones without payment 
         and adds it up with the sum of current section amount"""
+        self.compute_outstanding_balance(self.partner_id.id)
         subscription_period = self.subscription_period if not bill_generate else period
-        
+        if not self.section_line:
+            self.summary_line = False
         if self.section_line and self.state in MAIN_STATES:
             if not subscription_period:
                 raise ValidationError("Period is required!")
@@ -835,27 +866,6 @@ class App_Member(models.Model):
             for chd in child_added_line: 
                 self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount, bill_generate)
 
-    def period_transaction_line(self, record, subscription_period, payment_date, markpaid=False, reculate=False):
-        for rec in self:
-            values = {
-                    'subscription_period': subscription_period,
-                    'summary_line_id': record,
-                    'mark_paid': False,
-                    'date_paid': payment_date,
-                    }
-            rec.write({'period_payment_line': [(0, 0, values)]})
-
-    def create_period_payment(self, subscription_period, summ_line_id, date_paid, mark_paid=False):
-        pp_obj = self.env['period.payment']
-        period = self.subscription_period if self.state == "green" else subscription_period
-        pp_id = pp_obj.create({
-        'subscription_period': period,
-        'summary_line_id': summ_line_id,
-        'mark_paid': mark_paid,
-        'date_paid': fields.Date.today(),
-        })
-        return pp_id.id
-
     @api.multi
     def mass_mailing(self):
         # self.ensure_one()
@@ -901,10 +911,16 @@ class App_Member(models.Model):
         self.total = total
         
     @api.one
-    @api.depends('sub_line')
+    @api.depends('invoice_id')
     def get_subsequent_total(self):
-        if self.sub_line:
-            self.total_subsequent = sum([amt.paid_amount for amt in self.mapped('sub_line')])
+        if self.invoice_id:
+            invoices = self.mapped('invoice_id').filtered(lambda x: x.state not in ['draft'])
+            for rec in invoices:
+                payments = rec.mapped('payment_ids').filtered(lambda x: x.state in ['posted', 'sent', 'reconciled'])
+                if payments:
+                    self.total_subsequent = sum([amt.amount for amt in payments])
+        # if self.sub_line:
+        #     self.total_subsequent = sum([amt.paid_amount for amt in self.mapped('sub_line')])
  
     @api.onchange('partner_id')
     def get_partner_account(self):
@@ -930,6 +946,7 @@ class App_Member(models.Model):
             
     #@api.multi
     def run_crons(self):
+        # TODO Add a method to check the period to calculate and send bill to members
         '''The cron runs to check if the difference in year between the last payment and the current date
         is between the range of 4 - 5, if true, sets the member to inactive, if greater than 5 years, sets
         the member to dormant'''
@@ -1021,24 +1038,7 @@ class App_Member(models.Model):
                                     'property_account_payable_id': account_payable,
                                     })
             self.partner_id = part.id
-            # middle_name = " "
-            # if self.middle_name:
-            #     middle_name = self.middle_name
-            # names = str(self.first_name) +' '+str(self.middle_name)+' '+str(self.middle_name)
-            
-            # partner_search = self.env['res.partner'].search([('name', '=', names)])
-            # if not partner_search:
-            # part = partner.create({'street': self.street, 'email': self.email, 'state_id': self.state_id.id,
-            #                         'title':self.title.id, 'city':self.city, 'image': self.image,
-            #                         'phone':self.phone, 'function': self.occupation,
-            #                         'name': str(self.surname) +' '+ str(self.first_name) +' '+ middle_name,
-            #                         'property_account_receivable_id': self.account_id.id,
-            #                         'property_account_payable_id':self.account_id.id
-            #                         })
-            # self.partner_id = part.id
-            # else:
-            #     raise ValidationError('Member Already Existing, Kindly click the existing checkbox')
-            
+             
         else:
             pass 
         self.date_issue_white = fields.Datetime.now()
@@ -1073,17 +1073,17 @@ class App_Member(models.Model):
                         'date_of_last_sub': fields.Datetime.now(),
                         'date_of_temp': fields.Datetime.now(),
                         'state': 'temp'}) 
+        self.compute_outstanding_balance(self.partner_id.id)
 
     def define_invoice_line(self,invoice):
         inv_id = invoice.id
         invoice_line_obj = self.env["account.invoice.line"]
         journal = self.env['account.journal'].search([('type', '=', 'sale')], limit=1)
         prd_account_id = journal.default_credit_account_id.id
-        # section_lines = self.mapped('section_line') #.filtered(lambda self: self.sub_payment_id.paytype in ['others'])
-        section_lines = self.mapped('section_line') if self.state not in  ['ord', 'life', 'hon', 'jun', 'suspension'] else self.mapped('section_line') # .filtered(lambda self: self.sub_payment_id.paytype not in ['main_house', 'addition'])
+        section_lines = self.mapped('section_line') #  if self.state not in  ['ord', 'life', 'hon', 'jun', 'suspension'] else self.mapped('section_line') # .filtered(lambda self: self.sub_payment_id.paytype not in ['main_house', 'addition'])
         if section_lines:
             for record in section_lines:
-                record_amount = self.mapped('summary_line').filtered(lambda self: self.section_line_id.id == record.id)
+                record_amount = self.mapped('summary_line').filtered(lambda self: self.section_line_id.id == record.id and self.one_time_fee == False)
                 curr_invoice_line = {
                         'product_id': record.section_ids.product_id.id if record.section_ids.product_id.id else False, #product_search.id if product_search else False,
                         'name': "Charge for "+ str(record.sub_payment_id.name) + ' -- ' +str(record.section_ids.name),
@@ -1110,11 +1110,11 @@ class App_Member(models.Model):
             spouse_lines = self.mapped('depend_name').filtered(lambda self: self.relationship != 'Child')
             if child_lines:
                 for child in child_lines:
-                    section_lines = child.mapped('section_line') if self.state not in ['ord', 'life', 'hon', 'jun', 'suspension'] else child.mapped('section_line').filtered(lambda self: self.sub_payment_id.paytype not in ['main_house', 'entry_fee', 'addition'])
+                    section_lines = child.mapped('section_line') # if self.state not in ['ord', 'life', 'hon', 'jun', 'suspension'] else child.mapped('section_line').filtered(lambda self: self.sub_payment_id.paytype not in ['main_house', 'entry_fee', 'addition'])
                     child.biostar_status = False
 
                     for sub2 in section_lines:
-                        record_amount = self.mapped('summary_line').filtered(lambda self: self.section_line_id.id == sub2.id)
+                        record_amount = self.mapped('summary_line').filtered(lambda self: self.section_line_id.id == sub2.id and self.one_time_fee == False)
                         total = 0
                         amt = record_amount.total if record_amount else sub2.amount 
                         if sub2.is_child != True:
@@ -1148,10 +1148,10 @@ class App_Member(models.Model):
             if spouse_lines:
                 for spouse in spouse_lines:
                     spouse.biostar_status = False
-                    section_lines = spouse.mapped('section_line') if self.state not in  ['ord'] else spouse.mapped('section_line').filtered(lambda self: self.sub_payment_id.paytype not in ['main_house', 'entry_fee', 'addition'])
+                    section_lines = spouse.mapped('section_line') # if self.state not in  ['ord'] else spouse.mapped('section_line').filtered(lambda self: self.sub_payment_id.paytype not in ['main_house', 'entry_fee', 'addition'])
                     # section_lines = spouse.mapped('section_line')#.filtered(lambda self: self.sub_payment_id.paytype in ['special'])
                     for sub2 in section_lines:
-                        record_amount = self.mapped('summary_line').filtered(lambda self: self.section_line_id.id == sub2.id)
+                        record_amount = self.mapped('summary_line').filtered(lambda self: self.section_line_id.id == sub2.id and self.one_time_fee == False)
                         spousetotal = 0
                         amt = record_amount.total if record_amount else sub2.amount 
 
@@ -1194,8 +1194,8 @@ class App_Member(models.Model):
     
     @api.multi
     def create_member_bill(self):
-          
-        # product_name = product_name
+        self.calculate_overall_bill(self.subscription_period, False)
+        self.compute_outstanding_balance(self.partner_id.id)
         """ Create Customer Invoice for members.
         """
         invoice_list = []
@@ -1211,9 +1211,8 @@ class App_Member(models.Model):
                 'fiscal_position_id': inv.partner_id.property_account_position_id.id,
                 'branch_id': self.env.user.branch_id.id, 
                 'date_invoice': datetime.today(),
-                'type': 'out_invoice',
+                'type': 'out_invoice',  # customer invoices
                 'company_id': self.env.user.company_id.id, #self.company_id.id,
-                # 'type': 'out_invoice', # customer
             }) 
             if self.state == 'white':
                 section_lines = self.mapped('section_line').filtered(lambda self: self.sub_payment_id.paytype in ['addition'])
@@ -1260,7 +1259,7 @@ class App_Member(models.Model):
 
                 self.define_invoice_line(invoice) 
                 self.dependent_invoice_line(invoice)
-                self.create_outstanding_line(invoice.id)
+                # self.create_outstanding_line(invoice.id)
 
             invoice_list.append(invoice.id)
             
@@ -1275,25 +1274,35 @@ class App_Member(models.Model):
                     'type': 'ir.actions.act_window',
                     'views': [(tree_view_ref.id, 'tree'), (form_view_ref.id, 'form')],
                 } 
+    def compute_outstanding_balance(self, partner):
+        for rec in self:
+            acc_move_line = self.env['account.move.line'].sudo().search([('partner_id', '=', partner)])
+            total_residual_amount = 0
+            if acc_move_line:
+                for acc in acc_move_line:
+                    total_residual_amount += acc.amount_residual
+            rec.balance_total = total_residual_amount
+
     
     def create_outstanding_line(self, inv_id):
-        invoice_line_obj = self.env["account.invoice.line"] 
-        members_search = self.env['member.app'].search([('id', '=', self.id)])
-        account_obj = self.env['account.invoice']
-        accounts = account_obj.browse([inv_id]).journal_id.default_credit_account_id.id
-        # income_account = self.env['account.account'].search([('user_type_id.name', '=ilike', 'Income')], limit=1)
-        income_account = self.env['account.account'].search([('user_type_id','=',1 )], limit=1)
-        # balance = members_search.balance_total
-        balance = self.get_amount_to_pay()
-        if balance > 0:
-            curr_invoice_subs = {
-                                'name': "Outstanding Computed from Payment & Renewal lines", 
-                                'price_unit': balance, 
-                                'quantity': 1,
-                                'account_id': accounts if accounts else income_account.id,
-                                'invoice_id': inv_id,
-                                }
-            invoice_line_obj.create(curr_invoice_subs)
+        pass
+    #     invoice_line_obj = self.env["account.invoice.line"] 
+    #     members_search = self.env['member.app'].search([('id', '=', self.id)])
+    #     account_obj = self.env['account.invoice']
+    #     accounts = account_obj.browse([inv_id]).journal_id.default_credit_account_id.id
+    #     # income_account = self.env['account.account'].search([('user_type_id.name', '=ilike', 'Income')], limit=1)
+    #     income_account = self.env['account.account'].search([('user_type_id','=',1 )], limit=1)
+    #     # balance = members_search.balance_total
+    #     balance = self.get_amount_to_pay()
+    #     if balance > 0:
+    #         curr_invoice_subs = {
+    #                             'name': "Outstanding Computed from Payment & Renewal lines", 
+    #                             'price_unit': balance, 
+    #                             'quantity': 1,
+    #                             'account_id': accounts if accounts else income_account.id,
+    #                             'invoice_id': inv_id,
+    #                             }
+    #         invoice_line_obj.create(curr_invoice_subs)
 
     @api.multi
     def generate_receipt(self): 
@@ -1352,8 +1361,6 @@ class App_Member(models.Model):
     def sendmail_white_confirm(self, force=False):
         email_from = self.env.user.company_id.email
         group_user_id = self.env.ref('member_app.manager_member_ikoyi').id
-        #  extra = self.env.ref('ikoyi_module.inventory_officer_ikoyi').id
-        #  bodyxx
         extra = self.email
         bodyx = "Dear Sir/Madam, </br>We wish to notify that you have been issued a white prospect Card on the date: {}.</br>\
              </br> Please Endure to submit the card on or before the range of 3 months of the pickup date.</br>\
@@ -1371,7 +1378,6 @@ class App_Member(models.Model):
     def send_one_interview(self, force=False):
         email_from = self.env.user.company_id.email
         group_user_id = self.env.ref('member_app.manager_member_ikoyi').id
-        # extra = self.env.ref('ikoyi_module.inventory_officer_ikoyi').id
         extra = self.email 
         bodyx = "Dear Sir/Madam, </br>We wish to notify that you have been shortlisted for an interview at Ikoyi Club 1938.</br>\
                 </br>.</br>\
@@ -1390,7 +1396,6 @@ class App_Member(models.Model):
         for rec in self:
             email_from = self.env.user.company_id.email
             group_user_id = self.env.ref('member_app.manager_member_ikoyi').id
-            # extra = self.env.ref('ikoyi_module.inventory_officer_ikoyi').id
             extra = rec.email
             bodyx = "Dear Sir/Madam, </br>We wish to notify that you have \
              been shortlisted for an interview at Ikoyi Club 1938.</br>\
@@ -1570,14 +1575,13 @@ class App_Member(models.Model):
             elif current_month == 12:
                 interval = 0
 
-
         exp = dtoday + relativedelta(months=interval)
         expiry_date = exp.replace(day= 30)# .strftime('%Y-%m-%d %H:%M:%S')
         for rec in self:
             if rec.biostar_status not in ["Processed Successfully"]:
                 # "2020-06-01T00:00:00.00Z",
                 # '2020-12-31T23:59:00.00Z',
-                dummy_user_id = 1001111
+                dummy_user_id = 1001111 # used to test biostar api connection
                 userId = rec.biostar_user_id
                 # start_date_format = datetime.strftime(rec.biostar_start_date, "%Y-%m-%d") if rec.biostar_start_date else dtoday
                 start_date_format = datetime.strftime(dtoday, "%Y-%m-%d")
@@ -1621,7 +1625,6 @@ class App_Member(models.Model):
             # print(response2.json())
             resp_val = response2.json()
             #### ENDS HERE ####
-
             # THIRD REQUEST POSTS THE DETAILS FROM ERP TO BIOSTAR
             user_data = dict(
                             start_datetime = startDate, 
@@ -2908,7 +2911,7 @@ class RegisterSpouseMember(models.Model):
                 'company_id': self.env.user.company_id.id #self.company_id.id,
             })
         product = 0
-        self.create_outstanding_line(invoice.id)
+        # self.create_outstanding_line(invoice.id)
         for each in self.section_line:
             produce = each.section_ids.name
             products = self.env['product.product']
