@@ -91,15 +91,18 @@ class account_payment(models.Model):
         outstanding = self.balances if self.balances >= 0 else 0
         memb_payment = "Member Payments{}".format(self.subscription_period)
         renewal_name = "Subscription Payments for sections on period {}".format(self.subscription_period)
-        name = memb_payment if members_search.state not in MAIN_STATES else renewal_name
+        member_partner_ref = self.env['member.app'].search([('partner_id', '=', self.partner_id.id)], limit=1)
+        
         if members_search:
+            name = memb_payment if members_search.state not in MAIN_STATES else renewal_name
+
             if self.subscription_period:
                 total_sum = self.get_amount_to_pay()
                 # members_search.cripple_advance_and_outstanding()
                 members_search.subscription_payment_lines(name, total_sum, self.amount, self.payment_date, \
                     self.advance_amount, self.balances, self.subscription_period, self.id, True)
                 members_search.state_payment_inv(self.amount, self.payment_date) 
-                members_search.balance_total = members_search.balance_total + outstanding
+                # members_search.balance_total = members_search.balance_total + outstanding
                 
             else:
                 raise ValidationError('Please select period')
@@ -110,7 +113,7 @@ class account_payment(models.Model):
         sub_search = self.env['subscription.model'].search(domain_sub)
         if sub_search:
             # raise ValidationError(sub_search.member_id.balance_total + outstanding)
-            sub_search.member_id.balance_total = sub_search.member_id.balance_total + outstanding
+            # sub_search.member_id.balance_total = sub_search.member_id.balance_total + outstanding
             sub_search.state_payment_inv(self.amount, self.payment_date, self.id, self.payment_difference)
         else:
             pass
@@ -129,7 +132,7 @@ class account_payment(models.Model):
         domain_suspend = [('invoice_id', 'in', [item.id for item in self.invoice_ids])]
         suspend_search = self.env['suspension.model'].search(domain_suspend)
         if suspend_search:
-            suspend_search.member_id.balance_total = suspend_search.member_id.balance_total + outstanding
+            # suspend_search.member_id.balance_total = suspend_search.member_id.balance_total + outstanding
             suspend_search.state_payment_inv()
         else:
             pass 
@@ -147,6 +150,10 @@ class account_payment(models.Model):
         #     policy_search.button_confirm_member()
         # else:
         #     pass
+        if member_partner_ref:
+            member_partner_ref.compute_outstanding_balance(self.partner_id.id)
+            member_partner_ref.write({'payment_idss': [(4, self.id)]})
+
         return res
     subscription_period = fields.Selection([
         ('Jan-June 2011', 'Jan-June 2011'),

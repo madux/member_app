@@ -211,16 +211,14 @@
                             attrs="{'invisible': [('state','in',['draft','wait','induction','white_form_issued','life','issue_green','suspension','temp','white','jun','manager','green','manager_two','ord','interview','account'])]}"/>
                             <field name="state" id ="status_member" widget="statusbar" statusbar_visible="draft,white,green,ord,life"/>
                             <button name="run_crons" string="Change Status" confirm ="Are you sure you want to Confirm this Member to Inactive Or Dormant" help="Clicking this button will check the members last payment date and set to Dormant, InActive" type="object" icon="fa-registered" attrs="{'invisible': [('state','in',['draft','green','issue_green','wait','white'])]}" class="btn-primary" groups="base.user_root"/>
-                            <button name="generate_payment" string="Register Payment" help="Button to generate payment" type="object" icon="fa-registered" attrs="{'invisible': [('state','not in',['ord','jun','hon','suspension','life'])]}" class="btn-primary"/>
+                            <button name="generate_payment" string="Register Section Payment" help="Button to generate payment" type="object" icon="fa-registered" attrs="{'invisible': [('state','not in',['ord','jun','hon','suspension','life'])]}" class="btn-primary"/>
                             
                             <button name="changeactivestatus" string="Get Active"/>
                             <button name="migration_subscription" type="object" string="Run Migration"/>
                             <!-- <button name="migrate_company_button" type="object" string="Company Migration"/> -->
                             </header>
                             <sheet>
-                                <div class="oe_button_box" name="button_box">
-                                    <!-- <button name="membership_invoice" string="Create Invoice" type="object" icon="fa-registered" invisible ="1" class="oe_stat_button"
-                                        attrs="{'invisible': [('state','in',['draft','interview','induction','hon'])]}"/> -->
+                                <!-- <div class="oe_button_box" name="button_box">
                                     <button name="print_receipt" string="Print Receipt" type="object" icon="fa-registered"  class="oe_stat_button"
                                     attrs="{'invisible': [('state','in', ['draft','white'])]}"/>
                                     
@@ -233,6 +231,25 @@
                                     
                                     <button name="see_breakdown_invoice" string="See Invoices" type="object" class="oe_stat_button" icon="fa-shirtsinbulk" attrs="{'invisible': [('state','in',['draft'])]}"></button>
                                     <button name="print_id_card" string="Print card" type="object" class="oe_stat_button" icon="fa-print" attrs="{'invisible':[('state','in',['draft','white_form_issued','wait','white','jun','suspension','issue_green'])]}"></button>
+                                
+                                </div> -->
+                                <div class="oe_button_box" name="buttons">
+                                    <button name="print_receipt" string="Print Receipt" type="object" icon="fa-registered"  class="oe_stat_button"
+                                    attrs="{'invisible': [('state','in', ['draft','white'])]}"/>
+                                    
+                                    <button name="activate_biostar" string="Update BIOSTAR" type="object" icon="fa-registered"  class="oe_stat_button"
+                                    attrs="{'invisible':[('state','in',['draft','white_form_issued','wait','white','jun','suspension','issue_green'])]}"/>
+                                    
+                                    <button name="button_register_spouse" string="Register Dependants" type="object" icon="fa-registered" class="btn-primary"
+                                            attrs="{'invisible': [('state','in',['draft','white','white_form_issued','wait','suspension','interview'])]}"/>
+                                    <button name="batch_mailing" string="Mail Invoice" type="object" class="oe_stat_button" icon="fa-envelop" attrs="{'invisible': [('state','in',['draft'])]}"></button>
+                                    
+                                    <button name="see_breakdown_invoice" string="See Invoices" type="object" class="oe_stat_button" icon="fa-shirtsinbulk" attrs="{'invisible': [('state','in',['draft'])]}"></button>
+                                    <button name="print_id_card" string="Print card" type="object" class="oe_stat_button" icon="fa-print" attrs="{'invisible':[('state','in',['draft','white_form_issued','wait','white','jun','suspension','issue_green'])]}"></button>
+
+                                    <!-- <button name="clear_advances_payment" string="Clear Advances" type="object" class="oe_stat_button" icon="fa-money" attrs="{'invisible': [('state','in',['draft'])]}"></button>
+                                    <button name="clear_outstanding_payment" string="Clear Outstandings" type="object" class="oe_stat_button" icon="fa-money" attrs="{'invisible': [('state','in',['draft'])]}"></button> -->
+                                
                                 </div>
                                 <field name="image" widget="image" class="oe_avatar"/>
                 
