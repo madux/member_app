@@ -210,11 +210,9 @@
                             <button name="reverse_life" string="Reverse" type="object" icon="fa-registered" class="btn-primary" groups="base.group_system,member_app.manager_member_ikoyi"
                             attrs="{'invisible': [('state','in',['draft','wait','induction','white_form_issued','life','issue_green','suspension','temp','white','jun','manager','green','manager_two','ord','interview','account'])]}"/>
                             <field name="state" id ="status_member" widget="statusbar" statusbar_visible="draft,white,green,ord,life"/>
-                            <button name="run_crons" string="Change Status" confirm ="Are you sure you want to Confirm this Member to Inactive Or Dormant" help="Clicking this button will check the members last payment date and set to Dormant, InActive" type="object" icon="fa-registered" attrs="{'invisible': [('state','in',['draft','green','issue_green','wait','white'])]}" class="btn-primary" groups="base.user_root"/>
+                            <!-- <button name="run_crons" string="Change Status" confirm ="Are you sure you want to Confirm this Member to Inactive Or Dormant" help="Clicking this button will check the members last payment date and set to Dormant, InActive" type="object" icon="fa-registered" attrs="{'invisible': [('state','in',['draft','green','issue_green','wait','white'])]}" class="btn-primary" groups="base.user_root"/> -->
                             <button name="generate_payment" string="Register Section Payment" help="Button to generate payment" type="object" icon="fa-registered" attrs="{'invisible': [('state','not in',['ord','jun','hon','suspension','life'])]}" class="btn-primary"/>
-                            
-                            <button name="changeactivestatus" string="Get Active"/>
-                            <button name="migration_subscription" type="object" string="Run Migration"/>
+                            <!-- <button name="migration_subscription" type="object" string="Run Migration"/> -->
                             <!-- <button name="migrate_company_button" type="object" string="Company Migration"/> -->
                             </header>
                             <sheet>
@@ -400,7 +398,7 @@
                                                     
                                                     
                                                     <div class="oe_title">
-                                                        <label string="Total (Including Main House Fee - [Spouse Exclusive])"/>
+                                                        <label string="Total (Suubsription Fee - [Spouse Inclusive])"/>
                                                             <h1>
                                                                 <field name="total" string="Total (Invoice Total Bills)" 
                                                                 attrs="{'invisible': [('state','not in',['temp','manager','induction','ord','life','hon','account'])]}"/>
@@ -414,9 +412,9 @@
                                                             </h1>
                                                         </div><br/> 
                                                         <div class="oe_title">
-                                                        <label string="Outstandings"/>
+                                                        <label string="Outstandings Debit/Credit"/>
                                                             <h2>
-                                                                <field name="balance_total" string="Outstandings"/>
+                                                                <field name="balance_total" string="Outstandings Debit/Credit"/>
                                                             </h2>
                                                         </div>
 
