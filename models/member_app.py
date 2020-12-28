@@ -215,7 +215,7 @@ class App_Member(models.Model):
     nok_relationship = fields.Char("NOK Relationship")
 
     #  CALCULATE MMBER SUBSCRIPTION
-    total = fields.Integer(
+    total = fields.Float(
         'Total Including Subscription',
         compute='get_totals')
     total_subsequent = fields.Float(
@@ -223,6 +223,7 @@ class App_Member(models.Model):
         compute='get_subsequent_total', store=True)
 
     balance_total = fields.Float('Outstandings', store=True)
+    grand_total = fields.Float('Total', compute="get_grand_totals")
     due_date = fields.Datetime('Due payment date ')
     date_order = fields.Date('Offer Date', default=fields.Date.today())
     membership_date_from = fields.Date(string='Membership Start Date', help='Date from which membership becomes active.')
@@ -270,7 +271,11 @@ class App_Member(models.Model):
     activity = fields.Selection([('act', 'Active'),
                                  ('inact', 'InActive'),
                                  ('dom', 'Dormant'),
-                                 ], 'Active Status', default='act', index=True, required=True,  
+                                 ('pend', 'Pending'),
+                                 ('suspension', 'Suspension'),
+                                 ('asuspension', 'Self Suspension'),
+                                 ('del', 'Deleted'),
+                                 ], 'Status', default='act', index=True, required=True,  
                                  readonly=False, copy=False, track_visibility='always')
 
     subscription_period = fields.Selection([
@@ -345,7 +350,7 @@ class App_Member(models.Model):
                               ('jun', 'Junior'),
                               ('life', 'Life'),
                               ('hon', 'Honorary'),
-                              ('suspension', 'Suspension'),
+                            #   ('suspension', 'Suspension'),
                               ], default='draft', string='Status')
 
     sub_line = fields.One2many('subscription.line', 'member_id', string='Sub Lines')
@@ -900,15 +905,36 @@ class App_Member(models.Model):
         if fail_to_send:
             raise ValidationError(_("Mail failed for these members because they don't have email address" + str(fail_to_send)))
         return True   
- 
+
     @api.one
     @api.depends('subscription')
     def get_totals(self):
         section = 0.0
         total = 0.0
+        total2 = 0.0
+        totalx = 0.0
         for sub in self.section_line:
             total += sub.amount
-        self.total = total
+        for sub2 in self.depend_name:
+            total2 += sub2.member_price
+        totalx += total + total2 
+        self.total = totalx
+
+    @api.one
+    @api.depends('balance_total', 'total')
+    def get_grand_totals(self):
+        grand_totalx = 0.00
+        for grand in self:
+            grand_totalx += (self.balance_total - self.total)
+        self.grand_total = grand_totalx
+    # @api.one
+    # @api.depends('subscription')
+    # def get_totals(self):
+    #     section = 0.0
+    #     total = 0.0
+    #     for sub in self.section_line:
+    #         total += sub.amount
+    #     self.total = total
         
     @api.one
     @api.depends('invoice_id')
@@ -1767,6 +1793,7 @@ class App_Member(models.Model):
                 })
         sender =self.env['mail.template'].browse(template.id).with_context(ctx).send_mail(self.id)
         self.generate_mail_status()
+        # self.create_member_bill()
         # self.env['mail.mail'].browse(sender).send(sender)
         return True
 
