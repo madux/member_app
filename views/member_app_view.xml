@@ -538,6 +538,20 @@
                                                 </field>
                                         </form>
                                         </field>
+                                        <separator string="Summary line" colspan="4"/>
+                                        <div class="oe_button_box" name="calculate_overall_bill" style="box-shadow: none;">
+                                            <button type="object" class="oe_inline oe_stat_button" name="calculate_overall_bill" style="width: 215px !important;margin-right: 1%;margin-top: 3%;border:none;" string="Calculate Overall Bill" icon="fa-refresh"/>
+                                        </div>
+                                        <field name="section_line_abstract">
+                                            <tree string="All Section">
+                                                <field name="sub_payment_id" required="0"/>
+                                                <field name="section_ids" required="0"/>
+                                                <field name="amount"/>
+
+                                                        
+                                            </tree>
+                                        </field>
+
                                         <separator string="Email Status line" colspan="4"/>
 
                                         <field name="email_ids" readonly="1" string="Emails">
