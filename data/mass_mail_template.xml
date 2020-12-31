@@ -12,7 +12,7 @@
             <field name="model_id" ref="member_app.model_member_app"/>
             <field name="auto_delete" eval="True"/>
             <field name="report_template" ref="member_app.member_billing_report"/>
-            <field name="report_name">Bill_Attachment_For_${(object.partner_id.name or '').replace('/','_')}</field>
+            <field name="report_name">Bill_Attachment_For_${(object.identification or '').replace('/','_')}</field>
             <field name="lang">${object.partner_id.lang}</field>
             <field name="body_html"><![CDATA[
                 <div style="padding:0px;width:960px;margin:auto;background: #FFFFFF repeat top /100%;color:#777777">
@@ -24,9 +24,9 @@
                         </tr></tbody>
                     </table>
                 </div>
-                <p>Dear ${object.partner_id.name},<br/>
+                <p>${object.title.name} <span> ${object.partner_id.name}</span>,<br/>
                     <br/>
-                    Please find attached your Bill Notice
+                    Please find your attached Bill Notice for the period of ${object.subscription_period}
                     <br/><br/>
                     If you have any questions, please do not hesitate to ask us.
                     <br/><br/>
