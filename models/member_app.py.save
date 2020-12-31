@@ -1,8 +1,5 @@
-from __future__ import division
-import math 
-from collections import OrderedDict
+from __future__ import division import time import math from collections import OrderedDict
 from odoo.osv import expression
-import time
 from odoo import models, fields, api, _
 import odoo.addons.decimal_precision as dp
 from odoo.exceptions import except_orm, ValidationError
@@ -28,36 +25,6 @@ MAIN_STATES = [
     'hon', 'ord', 'jun','life'
     ]
 
-class AbstractSectionLine(models.TransientModel):
-    _name = "section.line.abstract"
-    abstract_id = fields.Many2one('member.app')
-    section_ids = fields.Many2one('section.product', string="Section")
-    section_line_id = fields.Many2one('section.line', string="Section Line id")
-    sub_payment_id = fields.Many2one('subscription.payment', string="Fee type")
-    dependent_type = fields.Selection([
-        ('member', 'Member'),
-        ('spouse', 'Spouse'),
-        ('child', 'Child'),
-        ('guest', 'Guest'),
-        ('relative', 'Relation')], string="Dependent type")
-    amount = fields.Float('Amount')
-
-    # def update_dependant_line(self):
-    #     child_line = self.mapped('depend_name').filtered(lambda child: child.relationship == "Child").mapped('section_line')
-    #     spouse_line = self.mapped('depend_name').filtered(lambda spouse: spouse.relationship != "Child").mapped('section_line')
-    #     spouse_total = 0
-    #     child_total = 0
-    #     for record in spouse_line:
-    #         spouse_total = record.amount
-    #         summarylineids = self.mapped('summary_line').filtered(lambda summ: summ.section_ids.name == record.section_ids.name and summ.sub_payment_id.id == record.sub_payment_id.id)
-    #         if summarylineids:
-    #             summarylineids.update({'spouse_cost': spouse_total, 'child_cost': 0, 'member_cost': 0,})
-
-    #     for rec in child_line:
-    #         child_total = rec.amount
-    #         summarylineids = self.mapped('summary_line').filtered(lambda summ: summ.section_ids.name == rec.section_ids.name and summ.sub_payment_id.id == rec.sub_payment_id.id)
-    #         if summarylineids:
-    #             summarylineids.update({'spouse_cost': 0, 'child_cost': child_total, 'member_cost': 0,})
 
 class App_Member(models.Model):
     _name = "member.app"
@@ -282,7 +249,6 @@ class App_Member(models.Model):
     subscription = fields.Many2many('subscription.payment', string='Add Sections')
     summary_line = fields.Many2many('summary.section.line', string='Cost Summary')
     section_line = fields.Many2many('section.line', string='Add Sections')
-    section_line_abstract = fields.One2many('section.line.abstract', 'abstract_id', string='Abstract Sections')
     email_ids = fields.Many2many('member.emailing.status', string="Email Status")
 
     payment_ids = fields.Many2many('account.payment', string='All Payments')# , compute="get_payment_ids")
@@ -674,10 +640,10 @@ class App_Member(models.Model):
                     })
 
 
-    def summary_line_func(self, rec, subscription_period, sub_payment_id, section_ids_id, section_ids_name, member_amountt, spouse_amountt, child_amountt, bill_generate, number_of_child=0, number_of_spouse = 0):
+    def summary_line_func(self, rec, subscription_period, sub_payment_id, section_ids_id, section_ids_name, member_amountt, spouse_amountt, child_amountt, bill_generate):
         summary_line_obj = self.env['summary.section.line']
         check_lines = self.mapped('summary_line').filtered(lambda s: s.section_ids.name == section_ids_name and s.sub_payment_id.id == sub_payment_id)
-         
+        
         # check_lines = self.mapped('summary_line').filtered(lambda s: s.section_line_id.id == rec)
         section_amount = self.env['section.line'].browse([rec])
         if check_lines:
@@ -685,9 +651,9 @@ class App_Member(models.Model):
                 if not check.one_time_fee:
                     if bill_generate == False:
                         check.write({
-                        'child_cost': child_amountt * number_of_child if child_amountt > 0 and check.child_cost <= 0 else check.child_cost, 
+                        'child_cost': child_amountt if child_amountt > 0 and check.child_cost <= 0 else check.child_cost, 
                         'member_cost': member_amountt if member_amountt > 0 and check.member_cost <= 0 else check.member_cost,
-                        'spouse_cost': spouse_amountt * number_of_spouse if spouse_amountt > 0 and check.spouse_cost <= 0 else check.spouse_cost,
+                        'spouse_cost': spouse_amountt if spouse_amountt > 0 and check.spouse_cost <= 0 else check.spouse_cost,
                         
                         'child_initial_amount': child_amountt if child_amountt > 0  else check.child_initial_amount, 
                         'member_initial_amount': member_amountt if member_amountt > 0 else check.member_initial_amount,
@@ -706,9 +672,9 @@ class App_Member(models.Model):
                 'section_line_id': rec,  
                 'sub_payment_id': sub_payment_id, 
                 'section_ids': section_ids_id, 
-                'child_cost': child_amountt * number_of_child,
+                'child_cost': child_amountt,
                 'member_cost': member_amountt,
-                'spouse_cost': spouse_amountt * number_of_spouse,
+                'spouse_cost': spouse_amountt,
                 'child_initial_amount': child_amountt if child_amountt > 0 else 0,
                 'member_initial_amount': member_amountt if member_amountt > 0 else 0,
                 'spouse_initial_amount': spouse_amountt if spouse_amountt > 0 else 0,
@@ -780,77 +746,6 @@ class App_Member(models.Model):
              
             self.summary_line = [(4, summary_line_id.id)]
 
-    def update_dependant_line(self, bill_generate):
-        child_line = self.mapped('depend_name').filtered(lambda child: child.relationship == "Child") 
-        spouse_line = self.mapped('depend_name').filtered(lambda spouse: spouse.relationship != "Child") 
-        spouse_total = 0
-        child_total = 0
-        summary_line_obj = self.env['summary.section.line']
-        dependent_list = []
-        for dep in spouse_line:
-            for record in dep.section_line:
-                abs_line = {'abstract_id': self.id, 'section_line_id': record.id, 'section_ids': record.section_ids.id, 'sub_payment_id': record.sub_payment_id.id, 'amount': record.amount, 'dependent_type': record.dependent_type}
-                dependent_list.append(self.env['section.line.abstract'].create(abs_line).id)
-
-        for dep in child_line:
-            for record in dep.section_line:
-                abs_line = {'abstract_id': self.id, 'section_line_id': record.id, 'section_ids': record.section_ids.id, 'sub_payment_id': record.sub_payment_id.id, 'amount': record.amount, 'dependent_type': record.dependent_type}
-                dependent_list.append(self.env['section.line.abstract'].create(abs_line).id)
-        self.write({'section_line_abstract': [(6, 0, dependent_list)]})
-        for sums in self.mapped('summary_line'):
-            sums.write({'spouse_cost': 0, 'child_cost': 0})
-
-        if self.section_line_abstract:
-            summaryline_id = None
-            spousecost = 0
-            childcost = 0
-            for record in self.mapped('section_line_abstract').filtered(lambda self: self.dependent_type != "child"):
-                summarylineids = self.mapped('summary_line').filtered(lambda summ: summ.section_ids.name == record.section_ids.name and summ.sub_payment_id.id == record.sub_payment_id.id)
-                if summarylineids:
-                    if not summarylineids.one_time_fee:
-                        if bill_generate == False:
-                            spousecost += record.amount
-                            summarylineids.write({'spouse_cost': summarylineids.spouse_cost + record.amount})
-                else:
-                    spousecost += record.amount
-                    summary_line_id = summary_line_obj.create({
-                        'section_line_id': record.section_line_id.id,
-                        'sub_payment_id': record.sub_payment_id.id,
-                        'section_ids': record.section_ids.id,
-                        'member_cost': 0,
-                        'spouse_cost': record.amount,
-                        'child_cost': 0,
-                        'spouse_initial_amount': record.amount, 
-                        'subscription_period': self.subscription_period,
-                    })
-                    summaryline_id = summary_line_id.id
-                    self.summary_line = [(4, summary_line_id.id)]
-                # self.env['summary.section.line'].browse([summaryline_id])
-            
-            for record in self.mapped('section_line_abstract').filtered(lambda self: self.dependent_type == "child"):
-                summarylineids = self.mapped('summary_line').filtered(lambda summ: summ.section_ids.name == record.section_ids.name and summ.sub_payment_id.id == record.sub_payment_id.id)
-                if summarylineids:
-                    if not summarylineids.one_time_fee:
-                        if bill_generate == False:
-                            childcost += record.amount
-                            summarylineids.write({'child_cost': summarylineids.child_cost + record.amount})
-                            # summaryline_id = summarylineids[0].id # .update({'spouse_cost': record.amount, 'child_cost': 0, 'member_cost': 0,})
-                else:
-                    childcost += record.amount
-                    summary_line_id = summary_line_obj.create({
-                        'section_line_id': record.section_line_id.id,
-                        'sub_payment_id': record.sub_payment_id.id,
-                        'section_ids': record.section_ids.id,
-                        'member_cost': 0,
-                        'spouse_cost': 0,
-                        'child_cost': record.amount,
-                        'child_initial_amount': record.amount, 
-                        'subscription_period': self.subscription_period,
-                    })
-                    summaryline_id = summary_line_id.id
-                    self.summary_line = [(4, summary_line_id.id)]
-
-
     def calculate_overall_bill(self, period, bill_generate=False):
         """Args: bill_generate: if false, when you hits this method, it will only update the summary section
         lines without updating or generating a new bill for non paid sections
@@ -864,30 +759,31 @@ class App_Member(models.Model):
             if not subscription_period:
                 raise ValidationError("Period is required!")
 
-        # spouse_subscription_lines = []
-        # child_subscription_line = []
-        # member_subscription_line = []
-        # member_levy_line = []
-        # spouse_levy_lines = []
-        # child_levy_line = []
-        # child_entry_line = [] 
-        # spouse_entry_line = [] 
-        # member_entry_line = []
-        # spouse_added_line = []
-        # child_added_line = []
-        # member_added_line = []
-        # dependants = self.mapped('depend_name')
-        # for dep in dependants:
-        #     if dep.relationship == 'Child':
-        #         child_subscription_line += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "subscription")
-        #         child_levy_line += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "levy")
-        #         child_entry_line += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "entry_fee")
-        #         child_added_line += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype in ["others","special", "addition"])
-        #     else:
-        #         spouse_subscription_lines += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "subscription")
-        #         spouse_levy_lines += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "levy")
-        #         spouse_entry_line += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "entry_fee")
-        #         spouse_added_line += dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype in ["others","special", "addition"])
+        spouse_subscription_lines = None
+        child_subscription_line = None
+        member_subscription_line = None
+        member_levy_line = None
+        spouse_levy_lines = None
+        child_levy_line = None
+        child_entry_line = None 
+        spouse_entry_line = None 
+        member_entry_line = None
+        spouse_added_line = None
+        child_added_line = None
+        member_added_line = None
+
+        dependants = self.mapped('depend_name')
+        for dep in dependants:
+            if dep.relationship == 'Child':
+                child_subscription_line = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "subscription")
+                child_levy_line = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "levy")
+                child_entry_line = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "entry_fee")
+                child_added_line = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype in ["others","special", "addition"])
+            else:
+                spouse_subscription_lines = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "subscription")
+                spouse_levy_lines = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "levy")
+                spouse_entry_line = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "entry_fee")
+                spouse_added_line = dep.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype in ["others","special", "addition"])
 
         member_subscription_line = self.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "subscription")
         member_levy_line = self.mapped('section_line').filtered(lambda s: s.sub_payment_id.paytype == "levy")
@@ -906,7 +802,11 @@ class App_Member(models.Model):
                         'section_ids': rec.section_ids.id,
                         'subscription_period': self.subscription_period,
                         'member_cost': rec.amount,
+                        'spouse_cost': 0,
+                        'child_cost': 0,
                         'member_initial_amount': rec.amount,
+                        # 'spouse_initial_amount': 0,
+                        # 'child_initial_amount': 0,
                     })
                     
                     # Adds the summary_object to the summary
@@ -917,65 +817,59 @@ class App_Member(models.Model):
                         if bill_generate == False:
                             check.write({ 
                                     'member_cost': rec.amount if check.member_cost <= 0 else check.member_cost,
+                                    'spouse_cost': 0 if check.spouse_cost <= 0 else check.spouse_cost,
+                                    'child_cost': 0 if check.child_cost <= 0 else check.child_cost,
+
                                     'member_initial_amount': rec.amount, 
+                                    'spouse_initial_amount': 0,
+                                    'child_initial_amount': 0,
                                 })
+                         
+                             
+
+        if spouse_subscription_lines:
+            for spo in spouse_subscription_lines: 
+                self.summary_line_func(spo.id, subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0,bill_generate)
+
+        if child_subscription_line:
+            for chd in child_subscription_line: 
+                self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount,bill_generate)
+                
         if member_levy_line:
             for rec in member_levy_line:
                 self.generate_member_summary_line(rec.id, subscription_period, rec.sub_payment_id.id, rec.section_ids.id,rec.section_ids.name, rec.amount,bill_generate)
+        
+        if spouse_levy_lines:
+            for spo in spouse_levy_lines: 
+                self.summary_line_func(spo.id, subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0,bill_generate)
+       
+        if child_levy_line:
+            for chd in child_levy_line: 
+                self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount,bill_generate)
+         
         if member_entry_line:
             for rec in member_entry_line:
                 self.generate_member_summary_line(rec.id, subscription_period, rec.sub_payment_id.id, rec.section_ids.id, rec.section_ids.name, rec.amount,bill_generate)
-        
-        if member_added_line:
-            for rec in member_added_line: 
-                self.generate_member_summary_line(rec.id, subscription_period, rec.sub_payment_id.id, rec.section_ids.id, rec.section_ids.name, rec.amount,bill_generate)
- 
-        self.update_dependant_line(bill_generate)                
 
-        # if spouse_subscription_lines:
-        #     for spo in spouse_subscription_lines: 
-        #         self.summary_line_func(spo.id, subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0,bill_generate,lenght_of_childsubscription, lenght_of_spouse_subscription_lines)
-
-         
-        # if child_subscription_line:
-        #     for chd in child_subscription_line:
-        #         self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount,bill_generate, lenght_of_childsubscription, lenght_of_spouse_subscription_lines)
-                
-        # if member_levy_line:
-        #     for rec in member_levy_line:
-        #         self.generate_member_summary_line(rec.id, subscription_period, rec.sub_payment_id.id, rec.section_ids.id,rec.section_ids.name, rec.amount,bill_generate)
-        
-        # if spouse_levy_lines:
-        #     for spo in spouse_levy_lines: 
-        #         self.summary_line_func(spo.id, subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0,bill_generate, lenght_of_child_levy_line, lenght_of_spouse_levy_lines)
-       
-        # if child_levy_line:
-        #     for chd in child_levy_line: 
-        #         self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount,bill_generate, lenght_of_child_levy_line, lenght_of_spouse_levy_lines)
-         
-        # if member_entry_line:
-        #     for rec in member_entry_line:
-        #         self.generate_member_summary_line(rec.id, subscription_period, rec.sub_payment_id.id, rec.section_ids.id, rec.section_ids.name, rec.amount,bill_generate)
-
-        # if spouse_entry_line:
-        #     for spo in spouse_entry_line: 
-        #         self.summary_line_func(spo.id,subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0,bill_generate, lenght_of_entry_line, lenght_of_spouse_entry_line)
+        if spouse_entry_line:
+            for spo in spouse_entry_line: 
+                self.summary_line_func(spo.id,subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0,bill_generate)
                  
-        # if child_entry_line:
-        #     for chd in child_entry_line: 
-        #         self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount,bill_generate, lenght_of_entry_line, lenght_of_spouse_entry_line)
+        if child_entry_line:
+            for chd in child_entry_line: 
+                self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount,bill_generate)
          
-        # if member_added_line:
-        #     for mem in member_added_line: 
-        #         self.summary_line_func(mem.id, subscription_period, mem.sub_payment_id.id, mem.section_ids.id, mem.section_ids.name, mem.amount, 0, 0,bill_generate)
+        if member_added_line:
+            for mem in member_added_line: 
+                self.summary_line_func(mem.id, subscription_period, mem.sub_payment_id.id, mem.section_ids.id, mem.section_ids.name, mem.amount, 0, 0,bill_generate)
         
-        # if spouse_added_line:
-        #     for spo in spouse_added_line: 
-        #         self.summary_line_func(spo.id, subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0, bill_generate,lenght_of_child_added_line, lenght_of_spouse_added_line)
+        if spouse_added_line:
+            for spo in spouse_added_line: 
+                self.summary_line_func(spo.id, subscription_period, spo.sub_payment_id.id, spo.section_ids.id, spo.section_ids.name, 0, spo.amount, 0, bill_generate)
        
-        # if child_added_line:
-        #     for chd in child_added_line: 
-        #         self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount, bill_generate,lenght_of_child_added_line, lenght_of_spouse_added_line)
+        if child_added_line:
+            for chd in child_added_line: 
+                self.summary_line_func(chd.id, subscription_period, chd.sub_payment_id.id, chd.section_ids.id, chd.section_ids.name, 0, 0, chd.amount, bill_generate)
 
     @api.multi
     def mass_mailing(self):
@@ -1033,7 +927,7 @@ class App_Member(models.Model):
         grand_totalx = 0.00
         for grand in self:
             grand_totalx += (self.balance_total - self.total)
-        self.grand_total = grand_totalx
+        self.grand_total = abs(grand_totalx)
     # @api.one
     # @api.depends('subscription')
     # def get_totals(self):
@@ -1222,7 +1116,7 @@ class App_Member(models.Model):
                         'name': "Charge for "+ str(record.sub_payment_id.name) + ' -- ' +str(record.section_ids.name),
                         'price_unit': record_amount.total,
                         'quantity': 1.0,
-                        'account_id': record.section_ids.product_id.categ_id.property_account_income_categ_id.id,
+                        'account_id': invoice.journal_id.default_credit_account_id.id if invoice.journal_id.default_credit_account_id else prd_account_id, #product_search.categ_id.property_account_income_categ_id.id,
                         'invoice_id': inv_id,
                             }
                 if record_amount.total > 0:
@@ -1270,7 +1164,7 @@ class App_Member(models.Model):
                             'name': "Child Charge for "+ str(sub2.sub_payment_id.name) + ' -- ' + str(sub2.section_ids.name), # if product_child else sub2.subscription.name)+ ": Period-"+(self.subscription_period),
                             'price_unit': total,
                             'quantity': 1.0,
-                            'account_id': sub2.section_ids.product_id.categ_id.property_account_income_categ_id.id,
+                            'account_id': invoice.journal_id.default_credit_account_id.id,# product_child.categ_id.property_account_income_categ_id.id or record.account_id.id,
                             'invoice_id': inv_id,
                         }
                         if record_amount.total > 0:
@@ -1305,7 +1199,7 @@ class App_Member(models.Model):
                             'name': "Spouse Charge for "+ str(sub2.sub_payment_id.name) + ' -- ' + str(sub2.section_ids.name), # if product_child else sub2.subscription.name)+ ": Period-"+(self.subscription_period),
                             'price_unit': spousetotal,
                             'quantity': 1.0,
-                            'account_id': sub2.section_ids.product_id.categ_id.property_account_income_categ_id.id,
+                            'account_id': invoice.journal_id.default_credit_account_id.id,# product_child.categ_id.property_account_income_categ_id.id or record.account_id.id,
                             'invoice_id': inv_id,
                         }
                         invoice_line_obj.create(curr_invoice_spouse_subs)
@@ -1340,7 +1234,7 @@ class App_Member(models.Model):
             inv.biostar_status = False
             invoice = invoice_obj.create({
                 'partner_id': inv.partner_id.id,
-                'account_id': inv.partner_id.property_account_receivable_id.id,
+                'account_id': inv.partner_id.property_account_receivable_id.id, # inv.partner_id.property_account_payable_id.id, 
                 'fiscal_position_id': inv.partner_id.property_account_position_id.id,
                 'branch_id': self.env.user.branch_id.id, 
                 'date_invoice': datetime.today(),
@@ -1410,7 +1304,7 @@ class App_Member(models.Model):
                 
     def compute_outstanding_balance(self, partner):
         for rec in self:
-            acc_move_line = self.env['account.move.line'].sudo().search([('partner_id', '=', partner)], limit=1)
+            acc_move_line = self.env['account.move.line'].sudo().search([('partner_id', '=', partner)])
             sign = -1 if (acc_move_line.amount_residual) > 0 else -1
             total_residual_amount = 0
             if acc_move_line:
@@ -1902,7 +1796,7 @@ class App_Member(models.Model):
                 })
         sender =self.env['mail.template'].browse(template.id).with_context(ctx).send_mail(self.id)
         self.generate_mail_status()
-        self.create_member_bill()
+        # self.create_member_bill()
         # self.env['mail.mail'].browse(sender).send(sender)
         return True
 
@@ -2785,6 +2679,7 @@ class RegisterSpouseMember(models.Model):
     surname = fields.Char(string='Surname', required=True)
     first_name = fields.Char(string='First Name', required=True)
     middle_name = fields.Char(string="Middle Name")
+    add_name = fields.Char(string="Name", compute="get_all_name", store=True)
     city = fields.Char('City')
     street = fields.Char('Street')
     url = fields.Char('Website')
@@ -2896,6 +2791,17 @@ class RegisterSpouseMember(models.Model):
     
     active = fields.Boolean(string='Active', default=True, readonly=True) 
     identification = fields.Char('ID No.', related="sponsor.identification")
+
+    @api.depends('surname', 'first_name', 'middle_name')
+    def get_all_name(self):
+        all_name = str(self.surname) +' '+ str(self.first_name) +' '+ str(self.middle_name)
+        self.add_name = all_name
+
+
+
+
+
+
         
     @api.one
     @api.depends('section_line')

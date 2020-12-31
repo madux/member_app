@@ -206,8 +206,12 @@ class MassEmailBilling(models.TransientModel):
         for id in ids:
             memberObjId = memberObj.browse([id])
             memberref = self.env['member.app'].search([('id', '=', memberObjId.id)])
-            if memberObjId.state == "ord" and memberObjId.email:
-                # memberref.calculate_overall_bill(self.subscription_period, False)
+            if memberObjId.activity == "act" and memberObjId.email:
+                memberref.calculate_overall_bill(self.subscription_period, False)
+                memberref.batch_mailing(self.subscription_period)
+                
+            elif memberObjId.activity == "inact" and memberObjId.email:
+                memberref.calculate_overall_bill(self.subscription_period, False)
                 memberref.batch_mailing(self.subscription_period)
 
     def activate_biostar(self):
